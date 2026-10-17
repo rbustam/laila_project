@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Laila — find your sound</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" async></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Laila home" data-screen="home">
+        <span class="brand-mark">☾</span><span>Laila</span>
+      </a>
+      <span class="topbar-note">The right song for any moment.</span>
+    </header>
+
+    <main>
+      <section id="welcomeScreen" class="screen welcome-screen">
+        <div class="welcome-orb">☾</div>
+        <p class="eyebrow">A LITTLE SPACE FOR YOU</p>
+        <h1>Music for the<br><span class="gold">way you feel.</span></h1>
+        <p class="subhead">Spotify knows what you like. Laila wants to know what you need right now.</p>
+        <button id="getStarted" class="primary-button welcome-cta">Get started <span>↗</span></button>
+        <button id="welcomeSkip" class="text-button">I’ve been here before</button>
+      </section>
+
+      <section id="moodScreen" class="screen mood-screen">
+        <p class="eyebrow">A MOMENT FOR YOU</p>
+        <h1>How are you<br><span class="gold">feeling right now?</span></h1>
+        <p class="subhead">No need to overthink it. Pick what feels closest.</p>
+        <div class="mood-grid">
+          <button class="mood-choice" data-mood="Calm">☁ <span>Calm</span></button>
+          <button class="mood-choice" data-mood="Happy">☀ <span>Happy</span></button>
+          <button class="mood-choice" data-mood="Low">☾ <span>A little low</span></button>
+          <button class="mood-choice" data-mood="Stressed">〰 <span>Stressed</span></button>
+          <button class="mood-choice" data-mood="Energised">✳ <span>Energised</span></button>
+          <button class="mood-choice" data-mood="Not sure">· · · <span>Not sure</span></button>
+        </div>
+        <label class="field-label" for="moodNote">Want to tell Laila a little more? <span class="optional">OPTIONAL</span></label>
+        <input id="moodNote" class="text-field" placeholder="A long day, a fresh start, anything…">
+        <div class="mood-footer">
+          <button id="skipMood" class="text-button">Skip check-in</button>
+          <button id="continueMood" class="primary-button">Find my music <span>↗</span></button>
+        </div>
+      </section>
+
+      <section id="homeScreen" class="screen active">
+        <div class="home-copy">
+          <p class="eyebrow" id="timeGreeting">YOUR MOMENT, YOUR MUSIC</p>
+          <h1>Good evening<span class="gold">.</span></h1>
+          <p class="subhead">What do you need music for right now?</p>
+        </div>
+
+        <form id="searchForm" class="search-box">
+          <span class="search-symbol" aria-hidden="true">⌕</span>
+          <input id="momentInput" type="text" maxlength="180" placeholder="Describe your moment…" autocomplete="off" aria-label="Describe your moment">
+          <button class="send-button" type="submit" aria-label="Find music">↗</button>
+        </form>
+
+        <div class="quick-section">
+          <p class="section-label">OR START WITH A MOMENT</p>
+          <div class="moment-grid">
+            <button class="moment-chip" data-prompt="Commute home"><span>↗</span>Commute home</button>
+            <button class="moment-chip" data-prompt="Morning commute"><span>☀</span>Morning commute</button>
+            <button class="moment-chip" data-prompt="Gym"><span>↗</span>Gym</button>
+            <button class="moment-chip" data-prompt="Feeling sad"><span>☾</span>Feeling sad</button>
+            <button class="moment-chip" data-prompt="Celebrating"><span>✳</span>Celebrating</button>
+          </div>
+        </div>
+
+        <button id="wearableToggle" class="wearable-card"><span class="wearable-icon">⌁</span><span><strong>Connect a wearable</strong><small>Optional · Use Oura or Apple Watch insights</small></span><span class="wearable-arrow">↗</span></button>
+        <div class="quiet-note"><span class="tiny-star">✳</span><span>A little less noise. A little more feeling.</span></div>
+        <div id="resultsSection" class="results-section hidden">
+          <div class="results-heading">
+            <div><p class="section-label">PICKED FOR THIS MOMENT</p><h2 id="resultsTitle">Your mix</h2></div>
+            <button id="clearResults" class="text-button">Clear</button>
+          </div>
+          <p id="resultsNote" class="results-note"></p>
+          <div id="trackList" class="track-list"></div>
+        </div>
+      </section>
+
+      <section id="playerScreen" class="screen player-screen">
+        <button class="back-button" id="backHome">← <span>Back to your moment</span></button>
+        <div class="player-intro"><p class="section-label">RIGHT HERE, RIGHT NOW</p><h1>Your moment<span class="gold">.</span></h1></div>
+        <div class="album-art-wrap">
+          <div class="album-art placeholder-art" id="playerArtwork"><span>☾</span></div>
+          <div class="art-glow"></div>
+        </div>
+        <div class="track-meta">
+          <div><h2 id="playerTitle">Choose a song</h2><p id="playerArtist">Your soundtrack is waiting</p></div>
+          <a id="storeLink" class="store-link hidden" href="#" target="_blank" rel="noopener" aria-label="Open song in music store">↗</a>
+        </div>
+        <p id="trackReason" class="track-reason">A little space to feel what you feel.</p>
+        <audio id="audioPlayer" preload="none"></audio>
+        <div class="progress-area">
+          <input id="seekSlider" type="range" min="0" max="30" value="0" aria-label="Track progress">
+          <div class="time-row"><span id="currentTime">0:00</span><span id="duration">0:30 preview</span></div>
+        </div>
+        <div class="player-controls">
+          <button id="previousButton" class="secondary-control" aria-label="Previous song">↶</button>
+          <button id="playButton" class="play-button" aria-label="Play preview">▶</button>
+          <button id="nextButton" class="secondary-control" aria-label="Next song">↠</button>
+        </div>
+        <p id="playbackNotice" class="playback-notice">30-second previews are available for some songs.</p>
+        <div class="player-adjustments">
+          <div class="adjustment-heading"><span>MOOD LIFT</span><span id="moodValue">A little lift</span></div>
+          <input id="moodSlider" type="range" min="0" max="100" value="55" aria-label="Mood lift">
+          <div class="range-ends"><span>Stay with me</span><span>Lift me up</span></div>
+          <div class="adjustment-heading time-heading"><span>LISTENING TIME</span><span id="listenValue">30 min</span></div>
+          <input id="listenSlider" type="range" min="10" max="90" step="5" value="30" aria-label="Listening time">
+          <div class="range-ends"><span>10 min</span><span>90 min</span></div>
+          <p id="sessionStatus" class="feedback-note">Listening session · 30 min left</p>
+        </div>
+        <div class="player-actions">
+          <button id="swapButton" class="outline-button">↻ Swap song</button>
+          <button id="surpriseButton" class="outline-button">✳ Surprise me</button>
+        </div>
+        <section class="feedback-panel">
+          <p class="section-label">HELP LAILA LEARN YOUR TASTE</p>
+          <div class="feedback-options">
+            <button class="feedback-button" data-feedback="spot">♡ <span>Spot on</span><small>Keep this vibe</small></button>
+            <button class="feedback-button" data-feedback="notquite">↗ <span>Not quite</span><small>Adjust next picks</small></button>
+            <button class="feedback-button" data-feedback="more">＋ <span>More like this</span><small>Lean into it</small></button>
+          </div>
+          <p id="feedbackNote" class="feedback-note">Your feedback helps shape future mixes on this device.</p>
+        </section>
+      </section>
+
+      <section id="profileScreen" class="screen profile-screen">
+        <button class="back-button" id="profileBack">← <span>Back</span></button>
+        <p class="section-label">MAKE IT YOURS</p>
+        <h1>Your profile<span class="gold">.</span></h1>
+        <p class="subhead">A few little details to make your music feel more like you.</p>
+        <form id="profileForm" class="profile-form">
+          <label class="field-label" for="displayName">What should we call you?</label>
+          <input id="displayName" class="text-field" maxlength="40" placeholder="Your name">
+          <label class="field-label">Genres you love</label>
+          <div class="option-grid" id="genreOptions">
+            <button type="button" class="option-chip" data-value="Pop">Pop</button>
+            <button type="button" class="option-chip" data-value="R&B">R&amp;B</button>
+            <button type="button" class="option-chip" data-value="Indie">Indie</button>
+            <button type="button" class="option-chip" data-value="Hip-hop">Hip-hop</button>
+            <button type="button" class="option-chip" data-value="Electronic">Electronic</button>
+            <button type="button" class="option-chip" data-value="Rock">Rock</button>
+            <button type="button" class="option-chip" data-value="Jazz">Jazz</button>
+            <button type="button" class="option-chip" data-value="Classical">Classical</button>
+          </div>
+          <label class="field-label" for="favoriteArtists">Favourite artists <span class="optional">OPTIONAL</span></label>
+          <input id="favoriteArtists" class="text-field" placeholder="e.g. SZA, The Weeknd, Laufey">
+          <label class="field-label">Your discovery style</label>
+          <div class="option-grid single-choice" id="discoveryOptions">
+            <button type="button" class="option-chip selected" data-value="A mix">A mix</button>
+            <button type="button" class="option-chip" data-value="Familiar favourites">Familiar favourites</button>
+            <button type="button" class="option-chip" data-value="Discover new music">Discover new music</button>
+          </div>
+          <label class="field-label">Your default vibe</label>
+          <div class="option-grid" id="vibeOptions">
+            <button type="button" class="option-chip" data-value="Comfort">Comfort</button>
+            <button type="button" class="option-chip" data-value="Calm">Calm</button>
+            <button type="button" class="option-chip" data-value="Focus">Focus</button>
+            <button type="button" class="option-chip" data-value="Energy">Energy</button>
+            <button type="button" class="option-chip selected" data-value="A mix">A mix</button>
+          </div>
+          <div class="profile-actions">
+            <button type="button" id="skipProfile" class="text-button">Maybe later</button>
+            <button type="submit" class="primary-button">Save profile <span>↗</span></button>
+          </div>
+        </form>
+        <div class="theme-setting apple-music-setting">
+          <div><strong>Full-song playback</strong><small id="appleMusicStatus">Connect Apple Music to play full tracks inside Laila.</small></div>
+          <button type="button" id="appleMusicConnect" class="outline-button">Connect Apple Music</button>
+        </div>
+        <p class="privacy-note">Apple Music requires your permission and an eligible Apple Music subscription for full-track playback.</p>
+        <div class="theme-setting">
+          <div><strong>Appearance</strong><small>Choose how Laila looks</small></div>
+          <div class="theme-toggle" role="group" aria-label="Choose appearance">
+            <button type="button" class="theme-option selected" data-theme-choice="light">☼ Light</button>
+            <button type="button" class="theme-option" data-theme-choice="dark">☾ Dark</button>
+          </div>
+        </div>
+        <p class="privacy-note">Your preferences are saved in this browser only.</p>
+      </section>
+    </main>
+
+    <button class="settings-gear" id="settingsGear" aria-label="Open settings" title="Settings">⚙</button>
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <button class="nav-item active" data-screen="home"><span>⌂</span><small>Home</small></button>
+      <button class="nav-item" data-screen="player"><span>♫</span><small>Playing</small></button>
+      <button class="nav-item" data-screen="profile"><span>◉</span><small>You</small></button>
+    </nav>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
