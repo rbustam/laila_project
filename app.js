@@ -16,7 +16,18 @@ const state = {
   mood: "",
   feedback: JSON.parse(localStorage.getItem("laila-feedback") || "{}"),
   sessionElapsed: 0, sessionTimer: null, sessionDuration: 30, sessionEnded: false,
-  usedTrackIds: [], moodLift: 55
+  usedTrackIds: [], moodLift: 55, suggestedArtists: []
+};
+
+const ARTISTS_BY_GENRE = {
+  "Pop": ["Taylor Swift", "Dua Lipa", "Chappell Roan", "Sabrina Carpenter", "The Weeknd", "Ariana Grande", "Olivia Rodrigo"],
+  "R&B": ["SZA", "H.E.R.", "Daniel Caesar", "Summer Walker", "Frank Ocean", "Alicia Keys", "The Weeknd"],
+  "Indie": ["Laufey", "Clairo", "Mitski", "The Marías", "Phoebe Bridgers", "Tame Impala", "beabadoobee"],
+  "Hip-hop": ["Kendrick Lamar", "Drake", "Tyler, The Creator", "J. Cole", "Travis Scott", "Doja Cat", "Little Simz"],
+  "Electronic": ["Fred again..", "Calvin Harris", "Disclosure", "ODESZA", "Daft Punk", "Flume", "Peggy Gou"],
+  "Rock": ["Arctic Monkeys", "Paramore", "Foo Fighters", "The Killers", "Fleetwood Mac", "Green Day", "The Strokes"],
+  "Jazz": ["Miles Davis", "Norah Jones", "Chet Baker", "Ella Fitzgerald", "Nina Simone", "Diana Krall", "Louis Armstrong"],
+  "Classical": ["Ludovico Einaudi", "Max Richter", "Ólafur Arnalds", "Yiruma", "Yo-Yo Ma", "Hania Rani", "Claude Debussy"]
 };
 
 const reasons = {
@@ -31,6 +42,20 @@ const reasons = {
   "sleep": "Something gentle to slow the world down."
 };
 
+function setPlayIcon(isPlaying) {
+  $("#playButton").classList.toggle("is-playing", isPlaying);
+  $("#playerScreen")?.classList.toggle("is-playing", isPlaying);
+  $("#playButton").setAttribute("aria-label", isPlaying ? "Pause" : "Play preview");
+}
+
+function updateRangeFill(input) {
+  const min = Number(input.min) || 0;
+  const max = Number(input.max) || 100;
+  const value = Number(input.value) || 0;
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  input.style.setProperty("--range-progress", `${Math.max(0, Math.min(100, pct))}%`);
+}
+
 function showToast(message) {
   const toast = $("#toast");
   toast.textContent = message;
@@ -40,11 +65,36 @@ function showToast(message) {
 }
 
 function switchScreen(screen) {
+  if (screen === "profile") { openProfile(); return; }
   state.screen = screen;
   $$(".screen").forEach((el) => el.classList.toggle("active", el.id === `${screen}Screen`));
   $$(".nav-item").forEach((el) => el.classList.toggle("active", el.dataset.screen === screen));
-  if (screen === "profile") loadProfile();
+  closeProfile();
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function openProfile() {
+  loadProfile();
+  const panel = $("#profileScreen");
+  // Open as an overlay only: preserve the current screen behind the blurred backdrop.
+  $("#profileBackdrop").hidden = false;
+  requestAnimationFrame(() => {
+    panel.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+    document.body.classList.add("profile-open");
+  });
+  $("#youButton").classList.add("active");
+  $("#closeProfile").focus({ preventScroll: true });
+}
+
+function closeProfile() {
+  const panel = $("#profileScreen");
+  if (!panel) return;
+  panel.classList.remove("open");
+  panel.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("profile-open");
+  $("#profileBackdrop").hidden = true;
+  $("#youButton")?.classList.remove("active");
 }
 
 function beginSession() {
@@ -55,12 +105,64 @@ function beginSession() {
   switchScreen("mood");
 }
 
-function startMomentSearch(prompt, autoplay = false) {
+function renderQueue() {
+  const list = $("#queueList");
+  if (!list) return;
+  const playable = getPlayableTracks();
+  list.innerHTML = "";
+  playable.forEach((track, index) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "queue-row" + (index === state.currentIndex ? " current" : "");
+    if (index === state.currentIndex) row.setAttribute("aria-current", "true");
+    const thumb = document.createElement("img");
+    thumb.className = "queue-thumb"; thumb.alt = ""; thumb.src = track.artwork || "";
+    thumb.onerror = () => { thumb.style.visibility = "hidden"; };
+    const info = document.createElement("span");
+    info.className = "queue-info";
+    const title = document.createElement("strong"); title.textContent = track.title;
+    const artist = document.createElement("small"); artist.textContent = track.artist;
+    info.append(title, artist);
+    const mark = document.createElement("span");
+    mark.className = "queue-mark";
+    if (index === state.currentIndex) mark.innerHTML = '<i></i><i></i><i></i>'; else mark.textContent = String(index + 1);
+    row.append(thumb, info, mark);
+    row.addEventListener("click", () => selectTrack(index, true));
+    list.append(row);
+  });
+  const total = playable.length;
+  $("#queueCount").textContent = total ? `${state.currentIndex + 1} of ${total}` : "";
+  $("#queueMeta").textContent = total ? `${total} songs` : "";
+  list.querySelector(".queue-row.current")?.scrollIntoView({ block: "nearest" });
+}
+
+function updatePlayerContext(track) {
+  const prompt = (state.momentLabel || state.currentPrompt || "").trim();
+  $("#playerMoment").textContent = prompt ? `For ${prompt.toLowerCase()}` : "Now playing";
+  renderQueue();
+  if ("mediaSession" in navigator && window.MediaMetadata) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title, artist: track.artist, album: track.album || "Laila",
+      artwork: track.artwork ? [{ src: track.artwork, sizes: "600x600" }] : []
+    });
+  }
+}
+
+function setFinding(on) {
+  state.finding = on;
+  const status = $("#moodStatus");
+  if (status) status.textContent = on ? "Finding your music…" : "";
+  $$(".mood-choice, #continueMood").forEach((el) => { el.disabled = on; });
+  $(".mood-screen")?.classList.toggle("is-finding", on);
+}
+
+function startMomentSearch(prompt, autoplay = true) {
+  if (state.finding) return;
   const mood = state.mood ? ` ${state.mood.toLowerCase()} mood` : "";
   const note = $("#moodNote").value.trim();
   const combined = [prompt, mood, note].filter(Boolean).join(" ");
   $("#momentInput").value = prompt;
-  findMusic(combined || prompt, { autoplay });
+  findMusic(combined || prompt, { autoplay, label: prompt });
 }
 
 function getReason(prompt, track, index) {
@@ -99,7 +201,7 @@ async function initializeAppleMusic() {
         state.appleMusic = MusicKit.getInstance();
         state.appleMusic.addEventListener("playbackStateDidChange", (event) => {
           const playing = Boolean(state.appleMusic?.isPlaying);
-          $("#playButton").textContent = playing ? "Ⅱ" : "▶";
+          setPlayIcon(playing);
           if (playing && !state.sessionEnded) startSessionClock();
         });
         $("#appleMusicStatus").textContent = "Connect your Apple Music account to play full songs.";
@@ -162,11 +264,16 @@ async function findMusic(prompt, options = {}) {
   const feedbackQuery = state.feedback.preference === "notquite" ? "different artist" : state.feedback.preference === "more" ? (artists || genres || "similar music") : "";
   const lower = cleanPrompt.toLowerCase();
   const momentQueries = [
+    ["not sure", "popular chill feel good songs"],
     ["gym", "workout energetic pop rock"],
     ["commute home", "feel good pop indie"],
     ["morning commute", "upbeat morning pop"],
     ["feeling sad", "comforting mellow songs"],
+    ["low", "comforting mellow songs"],
     ["sad", "comforting mellow songs"],
+    ["happy", "feel good happy pop hits"],
+    ["energised", "high energy dance pop rock"],
+    ["stressed", "calm soothing mellow music"],
     ["celebrat", "feel good party hits"],
     ["calm", "calm acoustic piano"],
     ["stress", "calm mellow music"],
@@ -175,20 +282,31 @@ async function findMusic(prompt, options = {}) {
     ["surprise", "popular alternative hits"]
   ];
   const momentSeed = (momentQueries.find(([needle]) => lower.includes(needle)) || ["", cleanPrompt])[1];
+  const favouriteArtistList = (profile.artists || "").split(",").map(x => x.trim()).filter(Boolean);
+  const genreArtists = (profile.genres || []).flatMap(genre => ARTISTS_BY_GENRE[genre] || []);
+  const preferredArtists = [...new Set([...favouriteArtistList, ...genreArtists])];
+  // Gather complementary searches into one playable queue instead of showing a menu of playlists.
   const candidates = [
     [momentSeed, genres, artists, liftQuery, discovery, feedbackQuery].filter(Boolean).join(" "),
     [momentSeed, genres, liftQuery].filter(Boolean).join(" "),
+    ...preferredArtists.slice(0, 5).map(artist => [momentSeed, artist, genres, liftQuery].filter(Boolean).join(" ")),
     [artists, genres, liftQuery].filter(Boolean).join(" "),
     momentSeed,
     cleanPrompt
-  ].filter((q, i, arr) => q && arr.indexOf(q) === i);
+  ].filter((q, i, arr) => q && arr.indexOf(q) === i).slice(0, 7);
   state.currentPrompt = cleanPrompt;
+  state.momentLabel = options.label || cleanPrompt;
   state.currentSearchQuery = candidates[0];
-  $("#resultsSection").classList.remove("hidden");
-  $("#resultsTitle").textContent = "Finding your sound…";
-  $("#resultsNote").textContent = "Looking for songs that fit your moment.";
-  $("#trackList").innerHTML = "";
-  if (!options.autoplay) switchScreen("home");
+  if (!options.autoplay) {
+    $("#resultsSection").classList.remove("hidden");
+    $("#resultsTitle").textContent = "Finding your sound…";
+    $("#resultsNote").textContent = "Looking for songs that fit your moment.";
+    $("#trackList").innerHTML = "";
+    switchScreen("home");
+  } else {
+    $("#resultsSection").classList.add("hidden");
+    setFinding(true);
+  }
   let lastError = null;
   let found = [];
   try {
@@ -202,19 +320,26 @@ async function findMusic(prompt, options = {}) {
         }
       }
     }
-    for (const query of (found.length ? [] : candidates)) {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Search failed");
-      const list = (payload.tracks || []).filter(isPlayable);
-      if (list.length) {
-        found = list;
-        state.currentSearchQuery = query;
-        break;
+    if (!found.length) {
+      const collected = [];
+      const seen = new Set();
+      for (const query of candidates) {
+        try {
+          const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || "Search failed");
+          for (const track of (payload.tracks || []).filter(isPlayable)) {
+            const key = track.trackId || track.id || track.previewUrl;
+            if (key && !seen.has(key)) { seen.add(key); collected.push(track); }
+          }
+          if (collected.length >= 18) break;
+        } catch (searchError) { lastError = searchError; }
       }
+      found = collected;
+      if (found.length) state.currentSearchQuery = candidates[0];
     }
     const fresh = found.filter(track => !state.usedTrackIds.includes(track.trackId || track.id || track.previewUrl));
-    state.tracks = fresh.length ? fresh : found;
+    state.tracks = (fresh.length ? fresh : found).slice(0, 18);
     if (options.autoplay) {
       const playable = getPlayableTracks();
       if (playable.length) {
@@ -233,6 +358,7 @@ async function findMusic(prompt, options = {}) {
     $("#resultsNote").textContent = lastError.message || "Please try again in a moment.";
     showToast("Music search didn't connect. Check your connection and try again.");
   }
+  setFinding(false);
   if (!found.length && !lastError) {
     state.tracks = [];
     if (options.autoplay) switchScreen("home");
@@ -305,7 +431,7 @@ function getPlayableTracks() {
   return state.tracks.filter(isPlayable);
 }
 
-function selectTrack(index, autoplay = false) {
+function selectTrack(index, autoplay = false, navigate = true) {
   const playable = getPlayableTracks();
   if (!playable.length) {
     showToast("Search for a song or moment to find playable previews.");
@@ -346,11 +472,13 @@ function selectTrack(index, autoplay = false) {
     store.classList.add("hidden");
   }
   $("#seekSlider").value = 0;
+  updateRangeFill($("#seekSlider"));
   $("#currentTime").textContent = "0:00";
   $("#duration").textContent = state.appleMusicActive ? "Full track" : "Preview";
-  $("#playButton").textContent = "▶";
+  setPlayIcon(false);
   $("#playbackNotice").textContent = state.appleMusicActive ? "Full-track playback via Apple Music." : "A short music preview. Connect Apple Music for full-track playback.";
-  switchScreen("player");
+  updatePlayerContext(track);
+  if (navigate) switchScreen("player");
   updateSessionDisplay();
   if (autoplay) playAudio();
 }
@@ -363,7 +491,7 @@ async function playAudio() {
       await state.appleMusic.setQueue({ song: track.id });
       await state.appleMusic.play();
       if (!state.sessionEnded) startSessionClock();
-      $("#playButton").textContent = "Ⅱ";
+      setPlayIcon(true);
       $("#playbackNotice").textContent = "Playing the full track through Apple Music.";
     } catch (error) {
       showToast("Apple Music couldn't start playback. Check your subscription and try again.");
@@ -378,9 +506,9 @@ async function playAudio() {
   try {
     await state.audio.play();
     if (!state.sessionEnded) startSessionClock();
-    $("#playButton").textContent = "Ⅱ";
+    setPlayIcon(true);
   } catch (error) {
-    $("#playButton").textContent = "▶";
+    setPlayIcon(false);
     showToast("Playback was blocked. Tap play again to start the preview.");
   }
 }
@@ -390,6 +518,42 @@ function formatTime(seconds) {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
+}
+
+function renderArtistSuggestions() {
+  const artists = [...new Set(state.genres.flatMap(genre => ARTISTS_BY_GENRE[genre] || []))].slice(0, 12);
+  state.suggestedArtists = artists;
+  const list = $("#artistSuggestionList");
+  const addButton = $("#addSuggestedArtists");
+  list.innerHTML = "";
+  const current = new Set(($("#favoriteArtists").value || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean));
+  artists.forEach(artist => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `option-chip ${current.has(artist.toLowerCase()) ? "selected" : ""}`;
+    chip.textContent = artist;
+    chip.dataset.artist = artist;
+    chip.setAttribute("aria-pressed", String(current.has(artist.toLowerCase())));
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("selected");
+      chip.setAttribute("aria-pressed", String(chip.classList.contains("selected")));
+      addButton.classList.toggle("hidden", !list.querySelector(".option-chip.selected"));
+    });
+    list.append(chip);
+  });
+  $("#artistSuggestions").classList.toggle("hidden", !artists.length);
+  addButton.classList.toggle("hidden", !artists.length || !list.querySelector(".option-chip.selected"));
+  $("#artistSuggestions .suggestion-note").textContent = state.genres.length
+    ? `Suggestions based on ${state.genres.join(", ")}. Select artists to add them to your favourites and future mood mixes.`
+    : "Choose a genre to discover at least five artists. Their songs can be included in your mood mixes.";
+}
+
+function addSelectedSuggestedArtists() {
+  const selected = $$("#artistSuggestionList .option-chip.selected").map(chip => chip.dataset.artist);
+  const existing = $("#favoriteArtists").value.split(",").map(x => x.trim()).filter(Boolean);
+  const merged = [...new Map([...existing, ...selected].map(name => [name.toLowerCase(), name])).values()];
+  $("#favoriteArtists").value = merged.join(", ");
+  showToast(`${selected.length} artist${selected.length === 1 ? "" : "s"} added to your favourites.`);
 }
 
 function loadProfile() {
@@ -402,6 +566,7 @@ function loadProfile() {
   state.discovery = saved.discovery || "A mix";
   state.vibe = saved.vibe || "A mix";
   syncOptionGroup("#genreOptions", state.genres);
+  renderArtistSuggestions();
   syncOptionGroup("#discoveryOptions", [state.discovery], true);
   syncOptionGroup("#vibeOptions", [state.vibe], true);
 }
@@ -423,9 +588,10 @@ function saveProfile() {
   try {
     localStorage.setItem("laila-profile", JSON.stringify(profile));
     state.profile = profile;
-    $("#avatarLetter").textContent = (profile.name || "L").slice(0, 1).toUpperCase();
+    const avatar = $("#avatarLetter"); if (avatar) avatar.textContent = (profile.name || "L").slice(0, 1).toUpperCase();
     localStorage.setItem("laila-visited", "yes");
     showToast("Your profile is saved on this device.");
+    closeProfile();
     beginSession();
   } catch {
     showToast("We couldn't save your profile in this browser.");
@@ -439,7 +605,8 @@ else switchScreen("welcome");
 
 $("#getStarted").addEventListener("click", () => {
   localStorage.setItem("laila-visited", "yes");
-  switchScreen("profile");
+  switchScreen("home");
+  openProfile();
 });
 $("#welcomeSkip").addEventListener("click", () => {
   localStorage.setItem("laila-visited", "yes");
@@ -454,15 +621,16 @@ $$(".mood-choice").forEach((button) => button.addEventListener("click", () => {
 }));
 $("#continueMood").addEventListener("click", () => {
   localStorage.setItem("laila-last-mood", state.mood);
-  switchScreen("home");
   if (state.mood || $("#moodNote").value.trim()) {
     startMomentSearch($("#moodNote").value.trim() || state.mood || "music for this moment", true);
   } else {
+    switchScreen("home");
     $("#momentInput").focus();
   }
 });
 $("#skipMood").addEventListener("click", () => switchScreen("home"));
 $("#wearableToggle").addEventListener("click", () => showToast("Wearable sync isn't connected in this build yet. You can continue without it; no health data is being accessed."));
+$("#addSuggestedArtists").addEventListener("click", addSelectedSuggestedArtists);
 $$(".feedback-button").forEach((button) => button.addEventListener("click", () => {
   const kind = button.dataset.feedback;
   state.feedback = { ...state.feedback, preference: kind, lastPrompt: state.currentPrompt, lastMood: state.mood, timestamp: Date.now(), counts: { ...(state.feedback.counts || {}), [kind]: ((state.feedback.counts || {})[kind] || 0) + 1 } };
@@ -478,7 +646,7 @@ $$(".feedback-button").forEach((button) => button.addEventListener("click", () =
 
 $("#searchForm").addEventListener("submit", (event) => {
   event.preventDefault();
-  findMusic($("#momentInput").value);
+  findMusic($("#momentInput").value, { autoplay: true });
 });
 $$("[data-prompt]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -487,19 +655,40 @@ $$("[data-prompt]").forEach((button) => {
   });
 });
 $$(".nav-item").forEach((button) => button.addEventListener("click", () => {
+  // "You" opens the profile overlay (its own handler); it must not switch or clear the current screen.
+  if (!button.dataset.screen) return;
   if (button.dataset.screen === "player" && !state.audio.src) {
     showToast("Choose a song first, then your player will be here.");
     return;
   }
   switchScreen(button.dataset.screen);
 }));
-$$(".brand").forEach((button) => button.addEventListener("click", (event) => {
+$("#youButton").addEventListener("click", openProfile);
+$("#closeProfile").addEventListener("click", closeProfile);
+$("#profileBackdrop").addEventListener("click", closeProfile);
+document.addEventListener("keydown", (event) => {
+  if (event.code === "Space" && state.screen === "player" && !/^(INPUT|TEXTAREA|BUTTON|A|SELECT)$/.test(document.activeElement?.tagName || "")) {
+    event.preventDefault();
+    $("#playButton").click();
+  }
+});
+if ("mediaSession" in navigator) {
+  const media = navigator.mediaSession;
+  try {
+    media.setActionHandler("play", () => $("#playButton").click());
+    media.setActionHandler("pause", () => $("#playButton").click());
+    media.setActionHandler("previoustrack", () => $("#previousButton").click());
+    media.setActionHandler("nexttrack", () => $("#nextButton").click());
+  } catch {}
+}
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && $("#profileScreen").classList.contains("open")) closeProfile();
+});
+$$(".brand, .nav-brand").forEach((button) => button.addEventListener("click", (event) => {
   event.preventDefault();
   switchScreen("home");
 }));
-$("#settingsGear").addEventListener("click", () => switchScreen("profile"));
 $("#backHome").addEventListener("click", () => switchScreen("home"));
-$("#profileBack").addEventListener("click", () => switchScreen("home"));
 $("#clearResults").addEventListener("click", () => {
   $("#resultsSection").classList.add("hidden");
   state.tracks = [];
@@ -511,18 +700,18 @@ $("#playButton").addEventListener("click", () => {
   else state.audio.pause();
 });
 $("#appleMusicConnect").addEventListener("click", connectAppleMusic);
-$("#previousButton").addEventListener("click", () => selectTrack(state.currentIndex - 1, true));
-$("#nextButton").addEventListener("click", () => selectTrack(state.currentIndex + 1, true));
+$("#previousButton").addEventListener("click", () => selectTrack(state.currentIndex - 1, true, state.screen === "player"));
+$("#nextButton").addEventListener("click", () => selectTrack(state.currentIndex + 1, true, state.screen === "player"));
 $("#swapButton").addEventListener("click", () => {
   const playable = getPlayableTracks();
   if (playable.length > 1) selectTrack(state.currentIndex + 1, true);
-  else findMusic(`${state.currentPrompt} different song`, { autoplay: true });
+  else findMusic(`${state.currentPrompt} different song`, { autoplay: true, label: state.momentLabel });
 });
 $("#surpriseButton").addEventListener("click", () => {
   const playable = getPlayableTracks();
   if (!playable.length) {
     $("#momentInput").value = "surprise me";
-    findMusic("surprise me unexpected discovery", { autoplay: true });
+    findMusic("surprise me unexpected discovery", { autoplay: true, label: "a surprise" });
     return;
   }
   const freshIndexes = playable.map((track, index) => ({ track, index })).filter(({ track }) => !state.usedTrackIds.includes(track.trackId || track.id || track.previewUrl));
@@ -533,29 +722,32 @@ $("#moodSlider").addEventListener("input", (event) => {
   const value = Number(event.target.value);
   state.moodLift = value;
   $("#moodValue").textContent = value < 34 ? "Stay with me" : value < 68 ? "A little lift" : "Lift me up";
+  updateRangeFill(event.target);
   localStorage.setItem("laila-mood-lift", String(value));
   $("#trackReason").textContent = value < 34 ? "Keeping things gentle and close to how you feel." : value < 68 ? "A balanced sound, following your pace." : "Leaning toward brighter, more uplifting sounds.";
 });
 $("#listenSlider").addEventListener("input", (event) => {
   state.sessionDuration = Number(event.target.value);
   $("#listenValue").textContent = `${event.target.value} min`;
+  updateRangeFill(event.target);
   localStorage.setItem("laila-listen-duration", String(state.sessionDuration));
   updateSessionDisplay();
 });
-state.audio.addEventListener("play", () => { $("#playButton").textContent = "Ⅱ"; });
-state.audio.addEventListener("pause", () => { $("#playButton").textContent = "▶"; });
+state.audio.addEventListener("play", () => { setPlayIcon(true); });
+state.audio.addEventListener("pause", () => { setPlayIcon(false); });
 state.audio.addEventListener("timeupdate", () => {
   const duration = state.audio.duration || 30;
   $("#seekSlider").max = duration;
   $("#seekSlider").value = state.audio.currentTime || 0;
+  updateRangeFill($("#seekSlider"));
   $("#currentTime").textContent = formatTime(state.audio.currentTime);
   $("#duration").textContent = `${formatTime(duration)} preview`;
 });
 state.audio.addEventListener("ended", () => {
-  $("#playButton").textContent = "▶";
+  setPlayIcon(false);
   if (!state.sessionEnded && getPlayableTracks().length > 1) {
     $("#playbackNotice").textContent = "Moving to the next preview in your mix…";
-    selectTrack(state.currentIndex + 1, true);
+    selectTrack(state.currentIndex + 1, true, false); // auto-advance stays on the current page
   } else {
     $("#playbackNotice").textContent = "Preview ended. Choose another song or replay this preview.";
   }
@@ -565,6 +757,7 @@ state.audio.addEventListener("error", () => {
 });
 $("#seekSlider").addEventListener("input", (event) => {
   if (Number.isFinite(state.audio.duration)) state.audio.currentTime = Number(event.target.value);
+  updateRangeFill(event.target);
 });
 $("#profileForm").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -578,6 +771,7 @@ $("#genreOptions").querySelectorAll(".option-chip").forEach((chip) => chip.addEv
   const value = chip.dataset.value;
   state.genres = state.genres.includes(value) ? state.genres.filter((x) => x !== value) : [...state.genres, value];
   syncOptionGroup("#genreOptions", state.genres);
+  renderArtistSuggestions();
 }));
 $("#discoveryOptions").querySelectorAll(".option-chip").forEach((chip) => chip.addEventListener("click", () => {
   state.discovery = chip.dataset.value;
@@ -623,11 +817,15 @@ function startSessionClock() {
     }
   }, 1000);
 }
-const savedLift = Number(localStorage.getItem("laila-mood-lift"));
+const savedLiftRaw = localStorage.getItem("laila-mood-lift");
+const savedLift = savedLiftRaw === null ? NaN : Number(savedLiftRaw);
 if (Number.isFinite(savedLift) && savedLift >= 0 && savedLift <= 100) { state.moodLift = savedLift; $("#moodSlider").value = String(savedLift); $("#moodValue").textContent = savedLift < 34 ? "Stay with me" : savedLift < 68 ? "A little lift" : "Lift me up"; }
 const savedDuration = Number(localStorage.getItem("laila-listen-duration"));
 if (Number.isFinite(savedDuration) && savedDuration >= 10 && savedDuration <= 90) { state.sessionDuration = savedDuration; $("#listenSlider").value = String(savedDuration); $("#listenValue").textContent = `${savedDuration} min`; }
 try { state.usedTrackIds = JSON.parse(localStorage.getItem("laila-recent-tracks") || "[]"); } catch { state.usedTrackIds = []; }
 updateSessionDisplay();
+updateRangeFill($("#seekSlider"));
+updateRangeFill($("#moodSlider"));
+updateRangeFill($("#listenSlider"));
 
 initializeAppleMusic();

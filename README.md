@@ -67,3 +67,7 @@ The server signs the Apple Music developer token locally from the private key an
 ### Configuration file
 
 Create a `.env` file from `.env.example`. The project intentionally does not include any real credentials.
+
+## Weather background
+
+On start, Laila asks the browser for your location, reads the current weather from Open-Meteo (free, no key) and paints a soft blurred sky behind the app that matches the weather and time of day (dawn, day, dusk, night; clear, partly cloudy, cloudy, fog, rain, storm, snow). If you decline location it tries an approximate location from your IP, then falls back to a time-of-day sky. Preview any scene by adding `?wx=rain&phase=night` to the address (wx: clear, partly, cloudy, fog, rain, storm, snow; phase: dawn, day, dusk, night).
