@@ -1,73 +1,57 @@
-# Laila — Full Core MVP
+# Laila — Full Core MVP (Render PostgreSQL)
 
-Laila is a minimal music companion built around the idea: **“The right song for any moment.”** This package implements the core listening journey as a runnable local web app.
+Laila is a minimal music companion built around **“The right song for any moment.”** This package keeps the existing web experience and uses Render PostgreSQL for accounts and cross-device profile sync. Supabase is no longer used by the app.
 
-## Run it
+## Run locally
 
-Requirements: Node.js 18 or newer.
+Requirements: Node.js 18 or newer and PostgreSQL.
 
 ```bash
-npm start
+npm install
+DATABASE_URL='postgresql://USER:PASSWORD@localhost:5432/laila' npm start
 ```
 
-Open http://localhost:3000. Keep the terminal open while using the app.
+Open http://localhost:3000. The server creates the required tables on first use. Set `NODE_ENV=production` only when running behind HTTPS; production sessions use Secure cookies.
 
-## Included and working
+## Render configuration
 
-- Welcome and optional first-time profile setup.
-- Mood check-in; selecting a mood immediately searches for music and opens the player when a playable preview is found.
-- Free-text moment search and quick moments (Commute home, Morning commute, Gym, Feeling sad, Celebrating).
-- iTunes Search API lookup through the Node server; preview-less tracks are excluded from playable results.
-- Desktop-friendly responsive UI, monochrome light theme, optional dark theme, and lower-left settings gear.
-- Audio preview playback, play/pause, previous/next, seek bar, artwork, store link and graceful preview errors.
-- One-line recommendation reason and a lightweight 0–10 energy estimate.
-- Mood-lift control, 10–90 minute session timer that counts active playback, swap song and Surprise Me.
-- Local profile preferences and feedback saved in the browser; preferences influence subsequent search queries.
-- Health endpoint at `/api/health`.
+1. In Render, open the **Laila web service → Environment**.
+2. Add `DATABASE_URL` using the **Internal Database URL** from the existing `db_laila` PostgreSQL database. Prefer the internal URL when the service and database are in the same region. Do not paste the URL into source files or commit it.
+3. Set `NODE_ENV` to `production`.
+4. Keep Build Command `npm install`, Start Command `npm start`, and Health Check Path `/api/health`.
+5. Deploy and test `https://YOUR-LAILA-DOMAIN/api/ready`. A successful response is `{"ok":true,"database":"connected"}`. A 503 means the database URL, network access, database status, or schema initialization needs attention.
+
+`render.yaml` declares `DATABASE_URL` as a secret environment variable (`sync: false`), so set its value in the Render dashboard. Do not expose it to browser code.
+
+## Account and profile APIs
+
+- `POST /api/auth/signup` — `{ "email": "...", "password": "..." }`; creates an account and signs in.
+- `POST /api/auth/login` — checks credentials and creates a session.
+- `POST /api/auth/logout` — revokes the current session.
+- `GET /api/auth/me` — returns the current user or `{"user":null}`.
+- `GET /api/profile` — returns the signed-in user's profile.
+- `PUT /api/profile` — saves the signed-in user's profile JSON.
+- `GET /api/health` — basic process health.
+- `GET /api/ready` — verifies database connectivity and schema readiness.
+
+Passwords are hashed using Node.js scrypt. Session tokens are random, stored only as SHA-256 digests in PostgreSQL, and sent to the browser using HttpOnly, SameSite=Lax cookies (Secure in production). API responses do not include password hashes or session tokens. Each profile is associated with the authenticated account by the server; user IDs are never accepted from the browser for profile writes.
+
+The schema is created automatically on server startup when `DATABASE_URL` is available. Tables are `laila_users`, `laila_sessions`, and `laila_profiles`. User and profile data persists across deployments because it is stored in PostgreSQL.
+
+## Existing features retained
+
+- Welcome and optional profile setup.
+- Mood check-in, free-text search, quick moments and iTunes preview search.
+- Audio preview playback, artwork, store links and playback controls.
+- Mood Lift, session timer, swap song and Surprise Me.
+- Personal and business/venue profiles.
+- Light/dark themes, weather backgrounds, responsive navigation.
+- Local profile storage remains as a fallback; signed-in profiles sync through the Render backend.
 
 ## Important limitations
 
-This is a functional **core MVP**, not a production music-streaming service. iTunes supplies short previews where available, not guaranteed full-song playback. The recommendation logic is lightweight rules plus search, not a trained AI model. Wearables are not connected; no health data is accessed. Profile and feedback are saved in this browser only, with no accounts, cloud sync or multi-device persistence. Production use would require a licensed full-track provider, real AI/recommendation service, account backend, privacy/security review and real device integrations.
+This remains a functional core MVP, not a production music-streaming service. iTunes supplies short previews where available. Recommendation logic is lightweight rules plus search. Business profiles do not provide commercial music licensing, guaranteed clean lyrics, uninterrupted playback, staff accounts, multi-zone controls or scheduling. Wearables and Apple Health are not connected.
 
-## Troubleshooting
+## Production hardening still recommended
 
-- If port 3000 is busy: `PORT=3001 npm start`, then open http://localhost:3001.
-- If music search fails, check internet access; the server calls the public iTunes Search API.
-- If a preview cannot play, try another result. Preview availability varies by song and region.
-
-## Enable full-song playback with Apple Music (recommended first provider)
-
-Laila now includes an optional MusicKit on the Web integration. Without credentials, it continues to work with iTunes preview clips. Once configured, a user can connect their Apple Music account in **Settings → Full-song playback**, and Laila will search Apple Music's catalogue and request playback for full tracks. Full catalogue playback requires the user's eligible Apple Music subscription and authorization.
-
-### Why Apple Music instead of Spotify first?
-
-- **Apple Music / MusicKit:** Apple officially supports streaming Apple Music catalog content directly in a website with a custom JavaScript player. This matches Laila's goal of keeping the user inside Laila. You need an Apple Developer Program membership, a MusicKit-enabled key, and the user's authorization; users need an eligible Apple Music subscription for full-song playback. See [MusicKit](https://developer.apple.com/musickit/) and [MusicKit on the Web](https://js-cdn.music.apple.com/musickit/v3/docs/).
-- **Spotify:** The Spotify Web Playback SDK can also play full tracks inside a browser, but it requires Spotify Premium for the playback user and Spotify developer app credentials; app access and platform policies apply. See [Spotify Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk) and [Spotify compliance tips](https://developer.spotify.com/compliance-tips).
-
-For this existing vanilla-JS web app, Apple Music is the most direct first integration because MusicKit is designed for web playback. Spotify remains a possible later provider.
-
-### Apple developer setup
-
-1. Enrol in the [Apple Developer Program](https://developer.apple.com/programs/) if you haven't already. Check Apple's current regional pricing before enrolling.
-2. In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/), create a **Media ID** and enable MusicKit for it.
-3. Create a **MusicKit key** with MusicKit enabled. Download the `.p8` private key and save it securely. Apple only offers the private key download once, so keep a protected backup.
-4. Note the **Key ID** and your **Team ID** from the developer account.
-5. Copy `.env.example` to `.env`, then fill in `APPLE_MUSIC_TEAM_ID`, `APPLE_MUSIC_KEY_ID`, and `APPLE_MUSIC_PRIVATE_KEY_PATH` with your values. Use the absolute path to your `.p8` file. Do not commit `.env` or the private key to GitHub or share it in chat.
-6. Restart the server with `npm start`, open Laila, go to the gear/settings, and choose **Connect Apple Music**.
-7. Test on `http://localhost:3000` first. Before deploying, configure your real HTTPS domain and verify Apple's current MusicKit origin/token requirements for that domain.
-
-The server signs the Apple Music developer token locally from the private key and serves the short-lived token to the browser. The private key itself is never sent to the browser. The token endpoint returns `configured: false` until credentials are present.
-
-### Current integration notes
-
-- Apple Music catalogue search is used after the user connects their account; iTunes previews remain the fallback when Apple Music is not connected or the catalogue lookup fails.
-- A user must explicitly connect/authorize Apple Music. Laila cannot bypass subscription eligibility, regional catalogue availability, or browser playback restrictions.
-- This is an initial integration, not yet a production-certified player. End-to-end testing with real Apple developer credentials and an eligible subscription is still required. Playback controls, progress timing, subscription edge cases, and deployed-domain authorization should be tested before public release.
-
-### Configuration file
-
-Create a `.env` file from `.env.example`. The project intentionally does not include any real credentials.
-
-## Weather background
-
-On start, Laila asks the browser for your location, reads the current weather from Open-Meteo (free, no key) and paints a soft blurred sky behind the app that matches the weather and time of day (dawn, day, dusk, night; clear, partly cloudy, cloudy, fog, rain, storm, snow). If you decline location it tries an approximate location from your IP, then falls back to a time-of-day sky. Preview any scene by adding `?wx=rain&phase=night` to the address (wx: clear, partly, cloudy, fog, rain, storm, snow; phase: dawn, day, dusk, night).
+Before broad public launch, add account email verification and password-reset flows, stronger distributed rate limiting, session rotation/cleanup scheduling, database backup/restore testing, a documented privacy/deletion process, and a security review. The initial implementation intentionally does not migrate existing Supabase accounts or data; do not delete the old Supabase project until any needed data has been exported and migration is decided.

@@ -262,6 +262,11 @@ async function findMusic(prompt, options = {}) {
   const liftQuery = lift < 34 ? "mellow acoustic" : lift < 68 ? "melodic pop" : "upbeat pop";
   const discovery = profile.discovery === "Familiar favourites" ? "hits" : profile.discovery === "Discover new music" ? "alternative" : "popular";
   const feedbackQuery = state.feedback.preference === "notquite" ? "different artist" : state.feedback.preference === "more" ? (artists || genres || "similar music") : "";
+  const isBusinessProfile = profile.profileType === "business";
+  const businessVibe = profile.businessVibe || "Balanced";
+  const businessEnergyQuery = ({ "Relaxed": "relaxed mellow background music", "Balanced": "easy-listening balanced background music", "Upbeat": "upbeat bright background music", "High energy": "high energy dance workout background music" })[businessVibe] || "background music";
+  const businessGuardrails = [profile.businessCleanOnly !== false ? "clean radio edit family friendly" : "", profile.businessLowVocals ? "instrumental minimal vocals" : ""].filter(Boolean).join(" ");
+  const businessContext = isBusinessProfile ? [profile.businessType, profile.businessAudience, profile.businessDaypart, profile.businessGenres, businessEnergyQuery, businessGuardrails, "background music"].filter(Boolean).join(" ") : "";
   const lower = cleanPrompt.toLowerCase();
   const momentQueries = [
     ["not sure", "popular chill feel good songs"],
@@ -287,10 +292,10 @@ async function findMusic(prompt, options = {}) {
   const preferredArtists = [...new Set([...favouriteArtistList, ...genreArtists])];
   // Gather complementary searches into one playable queue instead of showing a menu of playlists.
   const candidates = [
-    [momentSeed, genres, artists, liftQuery, discovery, feedbackQuery].filter(Boolean).join(" "),
-    [momentSeed, genres, liftQuery].filter(Boolean).join(" "),
-    ...preferredArtists.slice(0, 5).map(artist => [momentSeed, artist, genres, liftQuery].filter(Boolean).join(" ")),
-    [artists, genres, liftQuery].filter(Boolean).join(" "),
+    [momentSeed, isBusinessProfile ? businessContext : "", genres, artists, liftQuery, discovery, feedbackQuery].filter(Boolean).join(" "),
+    [momentSeed, isBusinessProfile ? businessContext : "", genres, liftQuery].filter(Boolean).join(" "),
+    ...preferredArtists.slice(0, 5).map(artist => [momentSeed, isBusinessProfile ? businessContext : "", artist, genres, liftQuery].filter(Boolean).join(" ")),
+    [artists, isBusinessProfile ? businessContext : "", genres, liftQuery].filter(Boolean).join(" "),
     momentSeed,
     cleanPrompt
   ].filter((q, i, arr) => q && arr.indexOf(q) === i).slice(0, 7);
@@ -300,7 +305,9 @@ async function findMusic(prompt, options = {}) {
   if (!options.autoplay) {
     $("#resultsSection").classList.remove("hidden");
     $("#resultsTitle").textContent = "Finding your sound…";
-    $("#resultsNote").textContent = "Looking for songs that fit your moment.";
+    $("#resultsNote").textContent = isBusinessProfile
+      ? `Tuning discovery for ${profile.businessName || "your venue"}. Clean-track and instrumental preferences guide search but are not guaranteed metadata filters.`
+      : "Looking for songs that fit your moment.";
     $("#trackList").innerHTML = "";
     switchScreen("home");
   } else {
@@ -560,6 +567,7 @@ function loadProfile() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem("laila-profile") || "{}"); } catch {}
   state.profile = saved;
+  setProfileType(saved.profileType || "personal", false);
   $("#displayName").value = saved.name || "";
   $("#favoriteArtists").value = saved.artists || "";
   state.genres = saved.genres || [];
@@ -569,7 +577,39 @@ function loadProfile() {
   renderArtistSuggestions();
   syncOptionGroup("#discoveryOptions", [state.discovery], true);
   syncOptionGroup("#vibeOptions", [state.vibe], true);
+  $("#businessName").value = saved.businessName || "";
+  $("#businessType").value = saved.businessType || "cafe";
+  $("#businessAudience").value = saved.businessAudience || "mixed";
+  $("#businessDaypart").value = saved.businessDaypart || "All day";
+  $("#businessGenres").value = saved.businessGenres || "";
+  $("#businessCleanOnly").checked = saved.businessCleanOnly !== false;
+  $("#businessLowVocals").checked = !!saved.businessLowVocals;
+  syncOptionGroup("#businessVibeOptions", [saved.businessVibe || "Balanced"], true);
 }
+
+window.addEventListener("laila-cloud-profile-loaded", (event) => {
+  const saved = event.detail || {};
+  state.profile = saved;
+  setProfileType(saved.profileType || "personal", false);
+  state.genres = Array.isArray(saved.genres) ? saved.genres : [];
+  state.discovery = saved.discovery || "A mix";
+  state.vibe = saved.vibe || "A mix";
+  const name = $("#displayName"); if (name) name.value = saved.name || "";
+  const artists = $("#favoriteArtists"); if (artists) artists.value = saved.artists || "";
+  syncOptionGroup("#genreOptions", state.genres);
+  renderArtistSuggestions();
+  syncOptionGroup("#discoveryOptions", [state.discovery], true);
+  syncOptionGroup("#vibeOptions", [state.vibe], true);
+  $("#businessName").value = saved.businessName || "";
+  $("#businessType").value = saved.businessType || "cafe";
+  $("#businessAudience").value = saved.businessAudience || "mixed";
+  $("#businessDaypart").value = saved.businessDaypart || "All day";
+  $("#businessGenres").value = saved.businessGenres || "";
+  $("#businessCleanOnly").checked = saved.businessCleanOnly !== false;
+  $("#businessLowVocals").checked = !!saved.businessLowVocals;
+  syncOptionGroup("#businessVibeOptions", [saved.businessVibe || "Balanced"], true);
+  const avatar = $("#avatarLetter"); if (avatar) avatar.textContent = (saved.businessName || saved.name || "L").slice(0, 1).toUpperCase();
+});
 
 function syncOptionGroup(selector, values, single = false) {
   $(`${selector}`).querySelectorAll(".option-chip").forEach((chip) => {
@@ -577,20 +617,51 @@ function syncOptionGroup(selector, values, single = false) {
   });
 }
 
+function setProfileType(type, announce = true) {
+  const safeType = type === "business" ? "business" : "personal";
+  $("#profileType").value = safeType;
+  syncOptionGroup("#profileTypeOptions", [safeType], true);
+  $("#personalProfileFields").classList.toggle("hidden", safeType !== "personal");
+  $("#businessProfileFields").classList.toggle("hidden", safeType !== "business");
+  $("#profileTitle").innerHTML = safeType === "business" ? 'Business sound profile<span class="gold">.</span>' : 'Your profile<span class="gold">.</span>';
+  $("#profileTypeNote").textContent = safeType === "business"
+    ? "Shape the atmosphere for your customers by venue type, energy and time of day. These settings guide discovery; they do not guarantee every track will meet every preference."
+    : "Your preferences guide your personal music discovery. They never lock you into one genre.";
+  if (announce) showToast(safeType === "business" ? "Business profile selected." : "Personal profile selected.");
+}
+
 function saveProfile() {
+  const profileType = $("#profileType").value;
   const profile = {
+    profileType,
     name: $("#displayName").value.trim(),
     genres: state.genres,
     artists: $("#favoriteArtists").value.trim(),
     discovery: state.discovery,
-    vibe: state.vibe
+    vibe: state.vibe,
+    businessName: $("#businessName").value.trim(),
+    businessType: $("#businessType").value,
+    businessAudience: $("#businessAudience").value,
+    businessVibe: $("#businessVibeOptions .option-chip.selected")?.dataset.value || "Balanced",
+    businessDaypart: $("#businessDaypart").value,
+    businessGenres: $("#businessGenres").value.trim(),
+    businessCleanOnly: $("#businessCleanOnly").checked,
+    businessLowVocals: $("#businessLowVocals").checked
   };
+  if (profileType === "business" && !profile.businessName) {
+    $("#businessName").focus();
+    showToast("Add a business or venue name before saving.");
+    return;
+  }
   try {
     localStorage.setItem("laila-profile", JSON.stringify(profile));
     state.profile = profile;
-    const avatar = $("#avatarLetter"); if (avatar) avatar.textContent = (profile.name || "L").slice(0, 1).toUpperCase();
+    if (window.LailaCloud?.isSignedIn()) window.LailaCloud.syncProfile(profile);
+    const avatar = $("#avatarLetter"); if (avatar) avatar.textContent = (profileType === "business" ? profile.businessName : profile.name || "L").slice(0, 1).toUpperCase();
     localStorage.setItem("laila-visited", "yes");
-    showToast("Your profile is saved on this device.");
+    showToast(profileType === "business"
+      ? (window.LailaCloud?.isSignedIn() ? "Business sound profile saved and syncing." : "Business sound profile saved on this device.")
+      : (window.LailaCloud?.isSignedIn() ? "Your profile is saved and syncing." : "Your profile is saved on this device."));
     closeProfile();
     beginSession();
   } catch {
@@ -664,6 +735,15 @@ $$(".nav-item").forEach((button) => button.addEventListener("click", () => {
   switchScreen(button.dataset.screen);
 }));
 $("#youButton").addEventListener("click", openProfile);
+$("#profileTypeOptions").addEventListener("click", (event) => {
+  const button = event.target.closest(".option-chip");
+  if (button) setProfileType(button.dataset.value);
+});
+$("#businessVibeOptions").addEventListener("click", (event) => {
+  const button = event.target.closest(".option-chip");
+  if (!button) return;
+  syncOptionGroup("#businessVibeOptions", [button.dataset.value], true);
+});
 $("#closeProfile").addEventListener("click", closeProfile);
 $("#profileBackdrop").addEventListener("click", closeProfile);
 document.addEventListener("keydown", (event) => {

@@ -1,12 +1,9 @@
 {
   "name": "laila-music-companion",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "A minimal, mobile-first music companion prototype",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=18"
-  }
+  "description": "A minimal, mobile-first music companion",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "pg": "^8.13.1" }
 }

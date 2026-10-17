@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=28">
+  <link rel="stylesheet" href="/styles.css?v=41">
   <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" async></script>
 </head>
 <body>
@@ -23,7 +23,6 @@
 
     <main>
       <section id="welcomeScreen" class="screen welcome-screen">
-        <div class="welcome-orb">☾</div>
         <p class="eyebrow">A LITTLE SPACE FOR YOU</p>
         <h1>Music for the<br><span class="gold">way you feel.</span></h1>
         <p class="subhead">Spotify knows what you like. Laila wants to know what you need right now.</p>
@@ -161,8 +160,32 @@
       <section id="profileScreen" class="profile-screen profile-drawer" role="dialog" aria-modal="true" aria-labelledby="profileTitle" aria-hidden="true">
         <div class="drawer-heading"><p class="section-label">MAKE IT YOURS</p><button type="button" id="closeProfile" class="drawer-close" aria-label="Close profile">Close</button></div>
         <h1 id="profileTitle">Your profile<span class="gold">.</span></h1>
-        <p class="subhead">A few little details to make your music feel more like you.</p>
+        <section class="theme-setting" id="accountPanel" style="display:block; margin: 1rem 0;">
+          <div><strong id="accountHeading">Sync your profile</strong><small id="accountStatus" role="status">Create an account to keep your preferences across devices. You can still use Laila without one.</small></div>
+          <form id="accountForm" style="display:grid; gap:.65rem; margin-top:.8rem;">
+            <label class="field-label" for="accountEmail">Email</label>
+            <input id="accountEmail" class="text-field" type="email" autocomplete="email" required placeholder="you@example.com">
+            <label class="field-label" for="accountPassword">Password</label>
+            <input id="accountPassword" class="text-field" type="password" autocomplete="current-password" minlength="10" required placeholder="At least 10 characters">
+            <div style="display:flex; flex-wrap:wrap; gap:.5rem;">
+              <button type="submit" id="accountSignIn" class="outline-button">Sign in</button>
+              <button type="button" id="accountSignUp" class="primary-button">Create account</button>
+              <button type="button" id="accountSignOut" class="outline-button" hidden>Sign out</button>
+            </div>
+          </form>
+        </section>
+        <p class="subhead">Set Laila up for you personally, or create a music profile for a business like a café, gym, shop or studio.</p>
+        <div class="profile-mode-wrap">
+          <span class="field-label">Who is this profile for?</span>
+          <div class="option-grid single-choice" id="profileTypeOptions" role="group" aria-label="Profile type">
+            <button type="button" class="option-chip selected" data-value="personal">Personal</button>
+            <button type="button" class="option-chip" data-value="business">Business / venue</button>
+          </div>
+          <p class="profile-mode-note" id="profileTypeNote">Your preferences guide your personal music discovery. They never lock you into one genre.</p>
+        </div>
         <form id="profileForm" class="profile-form">
+          <input type="hidden" id="profileType" value="personal">
+          <div id="personalProfileFields">
           <label class="field-label" for="displayName">What should we call you?</label>
           <input id="displayName" class="text-field" maxlength="40" placeholder="Your name">
           <label class="field-label">Genres you love</label>
@@ -198,6 +221,35 @@
             <button type="button" class="option-chip" data-value="Energy">Energy</button>
             <button type="button" class="option-chip selected" data-value="A mix">A mix</button>
           </div>
+          </div>
+          <div id="businessProfileFields" class="business-profile-fields hidden">
+            <p class="business-intro">Build a reusable sound profile for your space. You can edit it whenever your trading hours or atmosphere changes.</p>
+            <label class="field-label" for="businessName">Business / venue name</label>
+            <input id="businessName" class="text-field" maxlength="80" placeholder="e.g. Sunday Coffee">
+            <label class="field-label" for="businessType">Type of business</label>
+            <select id="businessType" class="text-field">
+              <option value="cafe">Café / restaurant</option><option value="gym">Gym / fitness studio</option><option value="retail">Retail / shop</option><option value="salon">Salon / wellness studio</option><option value="hotel">Hotel / hospitality</option><option value="office">Office / coworking</option><option value="other">Other business</option>
+            </select>
+            <label class="field-label" for="businessAudience">Who is usually in the space?</label>
+            <select id="businessAudience" class="text-field">
+              <option value="mixed">Mixed audience</option><option value="families">Families and children</option><option value="young-adults">Mostly young adults</option><option value="professionals">Professionals / work-focused</option><option value="fitness">Fitness-focused customers</option>
+            </select>
+            <label class="field-label">Overall atmosphere</label>
+            <div class="option-grid single-choice" id="businessVibeOptions">
+              <button type="button" class="option-chip" data-value="Relaxed">Relaxed</button><button type="button" class="option-chip selected" data-value="Balanced">Balanced</button><button type="button" class="option-chip" data-value="Upbeat">Upbeat</button><button type="button" class="option-chip" data-value="High energy">High energy</button>
+            </div>
+            <label class="field-label" for="businessDaypart">When should this sound profile apply?</label>
+            <select id="businessDaypart" class="text-field">
+              <option value="All day">All day</option><option value="Morning">Morning / opening</option><option value="Daytime">Daytime / peak trade</option><option value="Evening">Evening / close</option><option value="Class time">Classes / sessions</option>
+            </select>
+            <label class="field-label" for="businessGenres">Genres or sound references <span class="optional">OPTIONAL</span></label>
+            <input id="businessGenres" class="text-field" maxlength="180" placeholder="e.g. soulful house, mellow pop, instrumental">
+            <div class="business-guardrails">
+              <label class="business-check"><input type="checkbox" id="businessCleanOnly" checked> Prefer clean / family-friendly tracks</label>
+              <label class="business-check"><input type="checkbox" id="businessLowVocals"> Prefer fewer lyrics / more instrumental music</label>
+            </div>
+            <p class="privacy-note">This creates a saved venue preference profile. It does not yet provide licensed commercial music playback, multi-zone controls, scheduling automation or staff accounts.</p>
+          </div>
           <div class="profile-actions">
             <button type="button" id="skipProfile" class="text-button">Maybe later</button>
             <button type="submit" class="primary-button">Save profile</button>
@@ -219,7 +271,7 @@
             <button type="button" class="theme-option" data-theme-choice="dark">Dark</button>
           </div>
         </div>
-        <p class="privacy-note">Your preferences are saved in this browser only.</p>
+        <p class="privacy-note">Without an account, your preferences stay in this browser. Sign in to sync your profile.</p>
       </section>
     </main>
 
@@ -235,7 +287,8 @@
     </nav>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
-  <script src="/app.js?v=29"></script>
-  <script src="/weather.js?v=29"></script>
+  <script src="/server-auth.js?v=1"></script>
+  <script src="/app.js?v=41"></script>
+  <script src="/weather.js?v=41"></script>
 </body>
 </html>

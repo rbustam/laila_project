@@ -55,6 +55,58 @@
     return { phase, progress: Math.min(1, Math.max(0, progress)) };
   }
 
+
+  /* ---- Auto contrast ----
+     Works out how light/dark the current sky really is (including clouds and the sun/moon glow) and then
+     picks (a) how strong the readability veil must be and (b) a text colour for small grey text, so words
+     stay readable in every weather, time of day and theme. */
+  const toRGB = (str) => {
+    const m = String(str || "").trim().match(/#([0-9a-f]{6})|rgba?\(([^)]+)\)/i);
+    if (!m) return [128, 128, 128, 1];
+    if (m[1]) return [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16), 1];
+    const p = m[2].split(",").map((x) => parseFloat(x));
+    return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+  };
+  const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+
+  function adaptContrast() {
+    const cs = getComputedStyle(root);
+    const v = (n) => cs.getPropertyValue(n).trim();
+    const hazeO = parseFloat(v("--haze-o")) || 0;
+    const orbO = parseFloat(v("--orb-o")) || 0;
+    const haze = toRGB(v("--haze"));
+    const stops = ["--sky-a", "--sky-b", "--sky-c"].map((n) => mix(toRGB(v(n)), haze, hazeO));
+    const regions = stops.slice();
+    const sky = root.dataset.sky;
+    if (sky !== "clear") { // clouds: lighter by day, darker in rain/storm
+      const c = toRGB(v("--cloud"));
+      const dark = sky === "rain" || sky === "storm";
+      stops.forEach((s) => { const m = mix(s, c, Math.min(1, c[3] * 0.9)); regions.push(dark ? m.map((x) => x * 0.62) : m); });
+    }
+    if (orbO > 0.15) { const core = toRGB(v("--orb-core")); regions.push(mix(stops[1], core, 0.55 * orbO)); }
+    const lums = regions.map(lum);
+    const dark = document.documentElement.dataset.theme === "dark";
+    let veil, muted;
+    if (dark) { // light text: veil must darken the brightest part of the sky
+      const worst = regions[lums.indexOf(Math.max(...lums))];
+      let a = 0.5;
+      while (a < 0.9 && lum(mix(worst, [6, 8, 14], a)) > 0.07) a += 0.02;
+      veil = "rgba(6,8,14," + a.toFixed(2) + ")";
+      muted = "#d3d6dc";
+    } else {    // dark text: veil must lighten the darkest part of the sky
+      const worst = regions[lums.indexOf(Math.min(...lums))];
+      let a = 0.4;
+      while (a < 0.9 && lum(mix(worst, [255, 255, 255], a)) < 0.46) a += 0.02;
+      veil = "rgba(255,255,255," + a.toFixed(2) + ")";
+      muted = "#3b3f46";
+    }
+    document.documentElement.style.setProperty("--wb-scrim", veil);
+    document.documentElement.style.setProperty("--wb-muted", muted);
+  }
+  new MutationObserver(adaptContrast).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
   function paint(sky, phase, progress) {
     root.dataset.sky = sky;
     root.dataset.phase = phase;
@@ -67,6 +119,7 @@
     root.classList.toggle("is-night", isNight);
     root.classList.add("ready");
     document.documentElement.classList.add("has-weather-bg");
+    adaptContrast();
   }
 
   function render() {

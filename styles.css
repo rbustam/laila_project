@@ -984,9 +984,8 @@ html[data-theme="dark"] .weather-bg { --precip: rgba(205,222,255,.15); }
 @keyframes wb-flash { 0%,92%,96%,100% { opacity: 0; } 93% { opacity: .35; } 94.5% { opacity: .05; } 95% { opacity: .28; } }
 
 /* keeps text readable: a veil in the theme's own colour */
-.wb-scrim { position: absolute; inset: 0; background: rgba(255,255,255,.4); }
-html[data-theme="dark"] .wb-scrim { background: rgba(6,8,14,.56); }
-html:not([data-theme="dark"]) .weather-bg[data-phase="night"] .wb-scrim { background: rgba(255,255,255,.52); }
+.wb-scrim { position: absolute; inset: 0; background: var(--wb-scrim, rgba(255,255,255,.5)); transition: background .6s; }
+html[data-theme="dark"] .wb-scrim { background: var(--wb-scrim, rgba(6,8,14,.56)); }
 
 /* cards, chips and the side menu turn into soft frosted glass so the sky shows through */
 html.has-weather-bg .np-card, html.has-weather-bg .search-box, html.has-weather-bg .moment-chip, html.has-weather-bg .mood-choice,
@@ -998,3 +997,93 @@ html.has-weather-bg[data-theme="dark"] .feedback-button { background: rgba(20,22
 html.has-weather-bg .bottom-nav { background: rgba(255,255,255,.45) !important; -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
 html.has-weather-bg[data-theme="dark"] .bottom-nav { background: rgba(8,10,16,.5) !important; }
 @media (prefers-reduced-motion: reduce) { .wb-clouds i, .wb-precip, .wb-flash { animation: none !important; } }
+
+/* Account controls: keep hidden buttons hidden even when shared button styles apply. */
+#accountForm [hidden], #accountPanel [hidden] { display: none !important; }
+#accountPanel .field-label { margin-top: .15rem; }
+#accountPanel .outline-button, #accountPanel .primary-button { min-height: 42px; }
+
+/* Profile creator: personal listener and business/venue profiles */
+.profile-mode-wrap{margin:18px 0 8px;padding:15px;border:1px solid var(--line);border-radius:16px;background:rgba(127,139,160,.05)}
+.profile-mode-wrap>.field-label{display:block;margin:0 0 10px}
+.profile-mode-note,.business-intro{font-size:11px;line-height:1.6;color:var(--muted);margin:10px 0 0}
+.business-profile-fields{display:grid;gap:12px;margin-top:10px}
+.business-intro{margin:0 0 4px}
+.business-profile-fields select.text-field{appearance:auto}
+.business-guardrails{display:grid;gap:12px;margin:8px 0}
+.business-check{display:flex;align-items:flex-start;gap:10px;font-size:12px;line-height:1.45;color:var(--text)}
+.business-check input{accent-color:var(--amber);margin-top:2px}
+#personalProfileFields{display:grid;gap:12px}
+#personalProfileFields.hidden{display:none}
+@media(min-width:760px){.profile-mode-wrap{padding:18px}.business-profile-fields{gap:14px}}
+
+/* V31: small grey text gets a colour picked by weather.js so it always stays readable on the current sky */
+html.has-weather-bg .topbar-note, html.has-weather-bg .eyebrow, html.has-weather-bg #timeGreeting, html.has-weather-bg .subhead,
+html.has-weather-bg .section-label, html.has-weather-bg .quiet-note, html.has-weather-bg .quiet-note span, html.has-weather-bg .login-hint,
+html.has-weather-bg .back-button, html.has-weather-bg .track-reason, html.has-weather-bg .time-row span, html.has-weather-bg .range-ends span,
+html.has-weather-bg .feedback-note, html.has-weather-bg .playback-notice, html.has-weather-bg .np-count, html.has-weather-bg .queue-info small,
+html.has-weather-bg .track-meta p, html.has-weather-bg .adjustment-heading, html.has-weather-bg .results-note, html.has-weather-bg .field-label,
+html.has-weather-bg .np-context, html.has-weather-bg .np-moment, html.has-weather-bg .profile-mode-note, html.has-weather-bg .business-intro, html.has-weather-bg .welcome-screen .eyebrow, html.has-weather-bg .nav-item:not(.active):not(:hover), html.has-weather-bg .queue-mark, html.has-weather-bg .mood-status { color: var(--wb-muted, inherit) !important; }
+html.has-weather-bg input::placeholder { color: var(--wb-muted, inherit); opacity: .85; }
+
+
+/* V32: phones — navigation moves to a bottom bar (the logo sits top-left). Desktop/tablet keep the side menu. */
+@media (max-width: 700px) {
+  :root { --shell-pb: calc(86px + env(safe-area-inset-bottom, 0px)); --row-top: 62px; }
+  .bottom-nav {
+    position: fixed !important; inset: auto 0 0 0 !important; top: auto !important; width: 100% !important; height: auto !important; min-height: 0 !important;
+    transform: none !important; margin: 0 !important; padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    display: block !important; border: 0 !important; border-top: 1px solid rgba(0,0,0,.08) !important; border-right: 0 !important;
+    background: rgba(255,255,255,.78) !important; -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-sizing: border-box !important; z-index: 100 !important;
+  }
+  html[data-theme="dark"] .bottom-nav { background: rgba(10,12,18,.78) !important; border-top-color: rgba(255,255,255,.12) !important; }
+  html.has-weather-bg .bottom-nav { background: rgba(255,255,255,.62) !important; }
+  html.has-weather-bg[data-theme="dark"] .bottom-nav { background: rgba(8,10,16,.66) !important; }
+  .bottom-nav .nav-items {
+    position: static !important; transform: none !important; left: auto !important; right: auto !important; top: auto !important; width: 100% !important;
+    display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 6px !important; align-items: center !important; flex: none !important;
+  }
+  .bottom-nav .nav-items > .nav-item, .bottom-nav > .nav-item, .bottom-nav > #youButton {
+    width: 100% !important; height: 44px !important; min-height: 44px !important; flex: none !important; padding: 0 6px !important; margin: 0 !important;
+    font-size: 11px !important; letter-spacing: .12em !important; border-radius: 999px !important;
+  }
+  /* logo: top-left of the screen, still tappable to go home */
+  .bottom-nav .nav-brand {
+    position: fixed !important; top: 14px !important; left: 22px !important; transform: none !important; width: auto !important; height: 30px !important;
+    flex: none !important; margin: 0 !important; padding: 0 !important; z-index: 101;
+  }
+  .nav-logo { height: 30px !important; width: auto !important; }
+  .app-shell { padding: 0 22px calc(86px + env(safe-area-inset-bottom, 0px)) !important; }
+  .topbar { right: 22px !important; top: 22px !important; }
+  .settings-gear { bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
+  #toast, .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+@media (max-width: 700px) {
+  /* blur lives on a pseudo-layer so the logo (position: fixed) can escape the bar and sit top-left */
+  .bottom-nav, html.has-weather-bg .bottom-nav, html.has-weather-bg[data-theme="dark"] .bottom-nav, html[data-theme="dark"] .bottom-nav {
+    background: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border: 0 !important; }
+  .bottom-nav::before { content: ""; position: absolute; inset: 0; z-index: -1; border-top: 1px solid rgba(0,0,0,.08);
+    background: rgba(255,255,255,.78); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+  html[data-theme="dark"] .bottom-nav::before { background: rgba(10,12,18,.78); border-top-color: rgba(255,255,255,.12); }
+  html.has-weather-bg .bottom-nav::before { background: rgba(255,255,255,.62); }
+  html.has-weather-bg[data-theme="dark"] .bottom-nav::before { background: rgba(8,10,16,.66); }
+}
+html.has-weather-bg .mood-choice:not(.selected) span { color: var(--wb-muted, inherit) !important; }
+
+/* Welcome page (no moon): centred in the window like LAILA and the check-in, eyebrow pinned on the top row. */
+#welcomeScreen { position: relative; }
+#welcomeScreen.active {
+  display: flex; flex-direction: column; justify-content: center;
+  min-height: calc(100vh - var(--shell-pb)); min-height: calc(100dvh - var(--shell-pb));
+  padding: 64px 0; box-sizing: border-box;
+}
+#welcomeScreen > .eyebrow { position: absolute; top: var(--row-top); left: 0; margin: 0; }
+@media (max-width: 600px) { #welcomeScreen.active { padding: 84px 0 64px; } }
+
+/* The small eyebrow lines (A LITTLE SPACE FOR YOU / A MOMENT FOR YOU / YOUR MOMENT, YOUR MUSIC) now sit inside the
+   centred content, directly above each heading. Only the logo and the tagline stay on the top row. */
+#timeGreeting, #moodScreen > .eyebrow, #welcomeScreen > .eyebrow { position: static !important; top: auto !important; left: auto !important; margin: 0 0 14px !important; }
+@media (max-width: 600px) {
+  #homeScreen.active, #moodScreen.active, #welcomeScreen.active { padding: 76px 0 28px; }
+}
+#welcomeScreen > h1, #moodScreen > h1 { margin-top: 0; }
