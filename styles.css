@@ -1166,3 +1166,8 @@ html.has-weather-bg .mood-choice:not(.selected) span { color: var(--wb-muted, in
 @media (prefers-reduced-motion: reduce) {
   .screen { animation: none !important; }
 }
+
+/* V40.1: phones — keep "Back to your moment" clear of the logo (the logo is pinned top-left, 14px–44px). */
+@media (max-width: 700px) {
+  #playerScreen, #playerScreen.active { padding-top: 58px; }
+}
