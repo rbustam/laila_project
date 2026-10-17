@@ -1,2 +1,2 @@
-Laila v39 — Render PostgreSQL integration
-Based on the uploaded v38 eyebrow-merged project.
+Laila v40 — Mobile implementation pass
+Based on v39 Render PostgreSQL integration. CSS-only responsive improvements; database and account logic unchanged.

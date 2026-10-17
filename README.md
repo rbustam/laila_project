@@ -55,3 +55,8 @@ This remains a functional core MVP, not a production music-streaming service. iT
 ## Production hardening still recommended
 
 Before broad public launch, add account email verification and password-reset flows, stronger distributed rate limiting, session rotation/cleanup scheduling, database backup/restore testing, a documented privacy/deletion process, and a security review. The initial implementation intentionally does not migrate existing Supabase accounts or data; do not delete the old Supabase project until any needed data has been exported and migration is decided.
+
+
+## v40 mobile implementation pass
+
+This version adds CSS-only mobile layout refinements for narrow screens, safe-area spacing, touch target sizing, search/results, playback controls, profile inputs, and bottom navigation. The Render PostgreSQL/account implementation from v39 is unchanged.
